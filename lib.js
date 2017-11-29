@@ -10,6 +10,10 @@ let exec = (cmd, ...args) => {
     proc.on('error', reject);
 
     proc.on('exit', (code, sig) => {
+      if (!exec.errExit) {
+        return resolve(code !== null ? code : sig);
+      }
+
       if (code === 0) {
         return resolve(code);
       }
@@ -105,6 +109,8 @@ let exec = (cmd, ...args) => {
     },
   });
 };
+
+exec.errExit = true;
 
 module.exports = new Proxy(exec, {
   get: (_, k) => {
