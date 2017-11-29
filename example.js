@@ -1,23 +1,38 @@
 let sh = require('./lib');
 
+let log = console.log;
+
 async function main() {
-  // echo "Hello, world." | sed "s/world/my friend/"
+  log(`$ echo "Hello, world." | sed "s/world/my friend/"`);
   await sh.echo('Hello, world.').sed('s/world/my friend/');
+  log();
 
-  // echo "Hello, world." >> hellos
+  log(`$ echo "Hello, world." >> hellos`);
   await sh.echo('Hello, world.').appendTo('hellos');
+  log();
 
-  // cat hellos
-  console.log(await sh.cat('hellos').toString());
+  log(`$ cat hellos`);
+  log(await sh.cat('hellos').toString());
 
-  // cat example.js | grep example
+  log(`$ cat example.js | grep example`);
   await sh.cat('example.js').grep('example');
+  log();
 
-  // notify-send "i hackz ur computerz"
+  log(`$ notify-send "i hackz ur computerz"`);
   await sh('notify-send', `i hackz ur computerz`);
+  log();
 
-  // git show HEAD | head -n 1
-  await sh.git('show', 'HEAD').head('-n', 1);
+  log(`$ git show HEAD | head -n 1`);
+  await sh.git('show', 'HEAD').head({ n: 1 });
+  log();
+
+  log(`$ git diff --cached`);
+  await sh.git('diff', { cached: true });
+  log();
+
+  log(`$ git diff`);
+  await sh.git('diff', { cached: false });
+  log();
 
   process.exit();
 }
