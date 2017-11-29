@@ -138,6 +138,24 @@ let exec = (cmd, ...args) => {
 
 exec.errExit = true;
 
+let lastCmdSet = [];
+
+exec.setGlobals = async () => {
+  let compgen = exec('bash', '-c', 'compgen -c');
+  let cmdSet = (await compgen.toString()).split('\n');
+
+  let newCmds = cmdSet.filter(x => !lastCmdSet.includes(x));
+  let lostCmds = cmdSet.filter(x => lastCmdSet.includes(x));
+
+  newCmds.forEach(x => {
+    global[x] = (...args) => exec(x, ...args);
+  });
+
+  lostCmds.forEach(x => delete global[x]);
+
+  lastCmdSet = cmdSet;
+};
+
 module.exports = new Proxy(exec, {
   get: (_, k) => {
     if (k === 'then') {

@@ -1,38 +1,38 @@
 let sh = require('./lib');
 
-let log = console.log;
-
 async function main() {
-  log(`$ echo "Hello, world." | sed "s/world/my friend/"`);
-  await sh.echo('Hello, world.').sed('s/world/my friend/');
-  log();
+  await sh.setGlobals();
 
-  log(`$ echo "Hello, world." >> hellos`);
-  await sh.echo('Hello, world.').appendTo('hellos');
-  log();
+  await echo(`$ echo "Hello, world." | sed "s/world/my friend/"`);
+  await echo('Hello, world.').sed('s/world/my friend/');
+  await echo();
 
-  log(`$ cat hellos`);
-  log(await sh.cat('hellos').toString());
+  await echo(`$ echo "Hello, world." >> hellos`);
+  await echo('Hello, world.').appendTo('hellos');
+  await echo();
 
-  log(`$ cat example.js | grep example`);
-  await sh.cat('example.js').grep('example');
-  log();
+  await echo(`$ cat hellos`);
+  console.log(await cat('hellos').toString());
 
-  log(`$ notify-send "i hackz ur computerz"`);
+  await echo(`$ cat example.js | grep example`);
+  await cat('example.js').grep('example');
+  await echo();
+
+  await echo(`$ notify-send "i hackz ur computerz"`);
   await sh('notify-send', `i hackz ur computerz`);
-  log();
+  await echo();
 
-  log(`$ git show HEAD | head -n 1`);
-  await sh.git('show', 'HEAD').head({ n: 1 });
-  log();
+  await echo(`$ git show HEAD | head -n 1`);
+  await git('show', 'HEAD').head({ n: 1 });
+  await echo();
 
-  log(`$ git diff --cached`);
-  await sh.git('diff', { cached: true });
-  log();
+  await echo(`$ git diff --cached`);
+  await git('diff', { cached: true });
+  await echo();
 
-  log(`$ git diff`);
-  await sh.git('diff', { cached: false });
-  log();
+  await echo(`$ git diff`);
+  await git('diff', { cached: false });
+  await echo();
 
   process.exit();
 }
