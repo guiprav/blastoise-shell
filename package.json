@@ -1,0 +1,16 @@
+{
+  "name": "blastoise-shell",
+  "version": "1.0.0",
+  "description": "A powerful shell interface for Node",
+  "main": "lib.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/n2liquid/blastoise-shell.git"
+  },
+  "author": "Guilherme Prá Vieira (super.driver.512@gmail.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/n2liquid/blastoise-shell/issues"
+  },
+  "homepage": "https://github.com/n2liquid/blastoise-shell#readme"
+}
