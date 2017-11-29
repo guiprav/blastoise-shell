@@ -1,12 +1,6 @@
 let cp = require('child_process');
 
-let knownCmds = [
-  'cat', 'cd', 'chmod', 'cp', 'echo', 'find', 'grep',
-  'head', 'ln', 'ls', 'mkdir', 'mv', 'pwd', 'rm', 'sed',
-  'sort', 'tail', 'touch', 'uniq', 'which',
-];
-
-exports = module.exports = (cmd, ...args) => {
+let exec = (cmd, ...args) => {
   let proc = cp.spawn(cmd, args);
 
   let p = new Promise((resolve, reject) => {
@@ -18,17 +12,17 @@ exports = module.exports = (cmd, ...args) => {
       }
 
       if (code === null) {
-        return reject(new Error(`Terminated by signal ${sig}`));
+        return reject(new Error(`${cmd} terminated by signal ${sig}`));
       }
 
-      reject(new Error(`Exitted with code ${code}`));
+      reject(new Error(`${cmd} exitted with code ${code}`));
     });
   });
 
   p.proc = proc;
 
   p.pipe = (...args) => {
-    let pNext = exports(...args);
+    let pNext = exec(...args);
 
     proc.stdout.pipe(pNext.proc.stdin);
 
@@ -38,19 +32,29 @@ exports = module.exports = (cmd, ...args) => {
     return pNext;
   };
 
-  knownCmds.forEach(x => {
-    p[x] = (...args) => p.pipe(x, ...args);
-  });
-
   setTimeout(() => {
     ['stdin', 'stdout', 'stderr'].forEach(
       x => !proc[x].isPiped && proc[x].pipe(process[x])
     );
   }, 0);
 
-  return p;
+  return new Proxy(p, {
+    get: (_, k) => {
+      if (k === 'then') {
+        return p.then.bind(p);
+      }
+
+      return p[k] || ((...args) => p.pipe(k, ...args));
+    },
+  });
 };
 
-knownCmds.forEach(x => {
-  exports[x] = (...args) => exports(x, ...args);
+module.exports = new Proxy(exec, {
+  get: (_, k) => {
+    if (k === 'then') {
+      return p.then.bind(p);
+    }
+
+    return exec[k] || ((...args) => exec(k, ...args));
+  },
 });
