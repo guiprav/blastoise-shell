@@ -55,11 +55,21 @@ let exec = (cmd, ...args) => {
     fileStream.on('finish', resolve);
   });
 
-  setTimeout(() => {
-    ['stdin', 'stdout', 'stderr'].forEach(
-      x => !proc[x].isPiped && proc[x].pipe(process[x])
-    );
-  }, 0);
+  process.nextTick(() => {
+    if (!proc.stdin.isPiped) {
+      process.stdin.pipe(proc.stdin);
+      proc.stdin.isPiped = true;
+    }
+
+    ['stdout', 'stderr'].forEach(x => {
+      if (proc[x].isPiped) {
+        return;
+      }
+
+      proc[x].pipe(process[x]);
+      proc[x].isPiped = true;
+    });
+  });
 
   return new Proxy(p, {
     get: (_, k) => {
