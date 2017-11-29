@@ -16,6 +16,9 @@ async function main() {
   // notify-send "i hackz ur computerz"
   await sh('notify-send', `i hackz ur computerz`);
 
+  // git show HEAD | head -n 1
+  await sh.git('show', 'HEAD').head('-n', 1);
+
   process.exit();
 }
 
