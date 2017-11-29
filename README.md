@@ -14,8 +14,8 @@ $ cat hellos
 Hello, world.
 
 $ cat example.js | grep example
-  log(`$ cat example.js | grep example`);
-  await sh.cat('example.js').grep('example');
+  await echo(`$ cat example.js | grep example`);
+  await cat('example.js').grep('example');
 
 $ notify-send "i hackz ur computerz"
 
