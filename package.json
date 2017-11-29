@@ -12,5 +12,8 @@
   "bugs": {
     "url": "https://github.com/n2liquid/blastoise-shell/issues"
   },
-  "homepage": "https://github.com/n2liquid/blastoise-shell#readme"
+  "homepage": "https://github.com/n2liquid/blastoise-shell#readme",
+  "dependencies": {
+    "stream-to-string": "^1.1.0"
+  }
 }

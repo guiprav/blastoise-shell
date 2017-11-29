@@ -1,6 +1,8 @@
 let cp = require('child_process');
 let fs = require('fs');
 
+let streamToString = require('stream-to-string');
+
 let exec = (cmd, ...args) => {
   let proc = cp.spawn(cmd, args);
 
@@ -54,6 +56,13 @@ let exec = (cmd, ...args) => {
     fileStream.on('error', reject);
     fileStream.on('finish', resolve);
   });
+
+  p.toString = () => {
+    let ret = streamToString(proc.stdout);
+    proc.stdout.isPiped = true;
+
+    return ret;
+  };
 
   process.nextTick(() => {
     if (!proc.stdin.isPiped) {
