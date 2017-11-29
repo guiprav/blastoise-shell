@@ -1,4 +1,5 @@
 let cp = require('child_process');
+let fs = require('fs');
 
 let exec = (cmd, ...args) => {
   let proc = cp.spawn(cmd, args);
@@ -31,6 +32,28 @@ let exec = (cmd, ...args) => {
 
     return pNext;
   };
+
+  p.appendTo = path => new Promise((resolve, reject) => {
+    let fileStream = fs.createWriteStream(path, {
+      flags: 'a',
+    });
+
+    proc.stdout.pipe(fileStream);
+    proc.stdout.isPiped = true;
+
+    fileStream.on('error', reject);
+    fileStream.on('finish', resolve);
+  });
+
+  p.writeTo = path => new Promise((resolve, reject) => {
+    let fileStream = fs.createWriteStream(path);
+
+    proc.stdout.pipe(fileStream);
+    proc.stdout.isPiped = true;
+
+    fileStream.on('error', reject);
+    fileStream.on('finish', resolve);
+  });
 
   setTimeout(() => {
     ['stdin', 'stdout', 'stderr'].forEach(
