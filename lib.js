@@ -64,6 +64,13 @@ let exec = (cmd, ...args) => {
     return ret;
   };
 
+  p.errToString = () => {
+    let ret = streamToString(proc.stderr);
+    proc.stderr.isPiped = true;
+
+    return ret;
+  };
+
   process.nextTick(() => {
     if (!proc.stdin.isPiped) {
       process.stdin.pipe(proc.stdin);
