@@ -1,4 +1,4 @@
-let sh = require('blastoise-shell');
+let sh = require('./lib');
 
 async function main() {
   // echo "Hello, world." | sed "s/world/my friend/"
