@@ -22,6 +22,14 @@ let exec = (cmd, ...args) => {
     });
   });
 
+  p = Promise.all([
+    p, new Promise((resolve, reject) => {
+      proc.stdout.on('error', reject);
+      proc.stdout.on('finish', resolve);
+    }),
+  ])
+  .then(xs => xs[0]);
+
   p.proc = proc;
 
   p.pipe = (...args) => {
