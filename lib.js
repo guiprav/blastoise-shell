@@ -3,34 +3,10 @@ let fs = require('fs');
 
 let streamToString = require('stream-to-string');
 
+let expandArgs = require('./expandArgs');
+
 let exec = (cmd, ...args) => {
-  args = args.map(x => {
-    if (typeof x === 'string') {
-      return x;
-    }
-
-    return Object.entries(x).map(([k, v]) => {
-      if (v === false) {
-        return [];
-      }
-
-      k = `-${k}`;
-
-      if (k.length !== 2) {
-        k = `-${k}`;
-      }
-
-      if (v === true) {
-        return k;
-      }
-
-      return [k, v];
-    });
-  })
-  .reduce((a, b) => a.concat(b), [])
-  .reduce((a, b) => a.concat(b), []);
-
-  let proc = cp.spawn(cmd, args);
+  let proc = cp.spawn(cmd, expandArgs(args));
 
   let p = new Promise((resolve, reject) => {
     proc.on('error', reject);
