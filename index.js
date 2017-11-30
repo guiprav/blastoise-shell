@@ -197,6 +197,11 @@ exec.throwOnError = true;
     let lostCmds = cmdSet.filter(x => lastCmdSet.includes(x));
 
     newCmds.forEach(x => {
+      if (global[x]) {
+        cmdSet.splice(cmdSet.indexOf(x), 1);
+        return;
+      }
+
       global[x] = (...args) => exec(x, ...args);
     });
 
