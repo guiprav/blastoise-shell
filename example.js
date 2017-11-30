@@ -1,4 +1,4 @@
-let sh = require('./lib');
+let sh = require('.');
 
 async function main() {
   // This is never run due to lazy promise behavior:
