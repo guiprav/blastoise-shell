@@ -33,11 +33,11 @@ async function main() {
   await git('show', 'HEAD').head({ n: 1 });
   await echo();
 
-  await echo(`$ git diff --cached`);
+  await echo(`$ git diff --cached | head -n 1`);
   await git('diff', { cached: true }).head({ n: 1 });
   await echo();
 
-  await echo(`$ git diff`);
+  await echo(`$ git diff | head -n 1`);
   await git('diff', { cached: false }).head({ n: 1 });
   await echo();
 

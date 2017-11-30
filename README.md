@@ -23,12 +23,12 @@ $ cat example.js | grep example
 $ notify-send "i hackz ur computerz"
 
 $ git show HEAD | head -n 1
-commit dcb17a3c8db2d21ba51a771e257d2075b1f5c926
+commit 8d0fff98ba15b792225dfe8f0484f74db6a64a0d
 
-$ git diff --cached
+$ git diff --cached | head -n 1
 
-$ git diff
-diff --git a/README.md b/README.md
+$ git diff | head -n 1
+diff --git a/example.js b/example.js
 ```
 
 ## License
