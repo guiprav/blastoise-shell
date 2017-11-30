@@ -47,11 +47,11 @@ class BlastoiseProcExec extends Promise {
 
     let { stdin, stdout, stderr } = this.spawnConf;
 
-    let pOthers = [];
+    let pPrevExec;
 
     if (typeof stdin === 'object') {
       stdin.spawnConf.stdout = 'pipe';
-      pOthers.push(stdin.start());
+      pPrevExec = stdin.start();
     }
 
     let proc = this.proc = cp.spawn(this.cmd, this.args, {
@@ -104,7 +104,7 @@ class BlastoiseProcExec extends Promise {
     );
 
     let pAllDone = Promise.all([
-      pProcDone, ...pPipesFinished, ...pOthers,
+      pProcDone, ...pPipesFinished, pPrevExec,
     ])
     .then(xs => xs[0]);
 
