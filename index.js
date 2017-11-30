@@ -222,12 +222,15 @@ exec.fromString = str => {
 
 exec.throwOnError = true;
 
+module.exports = proxyWrap.root(exec);
+
+let enumCmds = require('./enumCmds');
+
 {
   let lastCmdSet = [];
 
   exec.setGlobals = async () => {
-    let compgen = exec('bash', '-c', 'compgen -c');
-    let cmdSet = (await compgen.toString()).split('\n');
+    let cmdSet = await enumCmds();
 
     let newCmds = cmdSet.filter(x => !lastCmdSet.includes(x));
     let lostCmds = cmdSet.filter(x => lastCmdSet.includes(x));
@@ -246,5 +249,3 @@ exec.throwOnError = true;
     lastCmdSet = cmdSet;
   };
 }
-
-module.exports = proxyWrap.root(exec);
