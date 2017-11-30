@@ -119,9 +119,7 @@ class BlastoiseProcExec extends Promise {
     ])
     .then(xs => xs[0]);
 
-    return this.promise = new Proxy(
-      pAllDone, instanceProxyHandlers
-    );
+    return this.promise = pAllDone;
   }
 
   appendTo(path) {
