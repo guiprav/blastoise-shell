@@ -5,18 +5,7 @@ let PLazy = require('p-lazy');
 let streamToString = require('stream-to-string');
 
 let expandArgs = require('./expandArgs');
-
-let instanceProxyHandlers = {
-  get: (exec, k) => {
-    let v = exec[k];
-
-    if (typeof v === 'function') {
-      return v.bind(exec);
-    }
-
-    return exec[k] || ((...args) => exec.pipe(k, ...args));
-  },
-};
+let proxyWrap = require('./proxyWrap');
 
 class BlastoiseProcExec extends Promise {
   constructor(cmd, args) {
@@ -191,8 +180,9 @@ class BlastoiseProcExec extends Promise {
   }
 }
 
-let exec = (cmd, ...args) =>
-  new Proxy(new BlastoiseProcExec(cmd, args), instanceProxyHandlers);
+let exec = (cmd, ...args) => proxyWrap.instance(
+  new BlastoiseProcExec(cmd, args)
+);
 
 exec.throwOnError = true;
 
@@ -216,18 +206,4 @@ exec.throwOnError = true;
   };
 }
 
-{
-  let rootProxyHandlers = {
-    get: (exec, k) => {
-      let v = exec[k];
-
-      if (typeof v === 'function') {
-        return v.bind(exec);
-      }
-
-      return exec[k] || ((...args) => exec(k, ...args));
-    },
-  };
-
-  module.exports = new Proxy(exec, rootProxyHandlers);
-}
+module.exports = proxyWrap.root(exec);
