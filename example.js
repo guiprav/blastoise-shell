@@ -1,11 +1,12 @@
 let sh = require('./lib');
 
 async function main() {
-  await sh.setGlobals();
 
   await sh.echo(`$ echo "Hello, world." | sed "s/world/my friend/"`);
   await sh.echo('Hello, world.').sed('s/world/my friend/');
   await sh.echo();
+
+  await sh.setGlobals();
 
   await echo(`$ echo "Hello, world." >> hellos`);
   await echo('Hello, world.').appendTo('hellos');
