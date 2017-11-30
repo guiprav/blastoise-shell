@@ -1,7 +1,7 @@
 let flatten = (a, b) => a.concat(b);
 
 module.exports = args => args.map(x => {
-  if (typeof x === 'string') {
+  if (typeof x !== 'object') {
     return x;
   }
 

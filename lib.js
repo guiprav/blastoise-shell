@@ -5,139 +5,197 @@ let streamToString = require('stream-to-string');
 
 let expandArgs = require('./expandArgs');
 
-let exec = (cmd, ...args) => {
-  let proc = cp.spawn(cmd, expandArgs(args));
+let instanceProxyHandlers = {
+  get: (exec, k) => {
+    let v = exec[k];
 
-  let p = new Promise((resolve, reject) => {
-    proc.on('error', reject);
-
-    proc.on('exit', (code, sig) => {
-      if (!exec.errExit) {
-        return resolve(code !== null ? code : sig);
-      }
-
-      if (code === 0) {
-        return resolve(code);
-      }
-
-      if (code === null) {
-        return reject(new Error(`${cmd} terminated by signal ${sig}`));
-      }
-
-      reject(new Error(`${cmd} exitted with code ${code}`));
-    });
-  });
-
-  p = Promise.all([
-    p, new Promise((resolve, reject) => {
-      proc.stdout.on('error', reject);
-      proc.stdout.on('finish', resolve);
-    }),
-  ])
-  .then(xs => xs[0]);
-
-  p.proc = proc;
-
-  p.pipe = (...args) => {
-    let pNext = exec(...args);
-
-    proc.stdout.pipe(pNext.proc.stdin);
-
-    proc.stdout.isPiped = true;
-    pNext.proc.stdin.isPiped = true;
-
-    return pNext;
-  };
-
-  p.appendTo = path => new Promise((resolve, reject) => {
-    let fileStream = fs.createWriteStream(path, {
-      flags: 'a',
-    });
-
-    proc.stdout.pipe(fileStream);
-    proc.stdout.isPiped = true;
-
-    fileStream.on('error', reject);
-    fileStream.on('finish', resolve);
-  });
-
-  p.writeTo = path => new Promise((resolve, reject) => {
-    let fileStream = fs.createWriteStream(path);
-
-    proc.stdout.pipe(fileStream);
-    proc.stdout.isPiped = true;
-
-    fileStream.on('error', reject);
-    fileStream.on('finish', resolve);
-  });
-
-  p.toString = () => {
-    let ret = streamToString(proc.stdout);
-    proc.stdout.isPiped = true;
-
-    return ret;
-  };
-
-  p.errToString = () => {
-    let ret = streamToString(proc.stderr);
-    proc.stderr.isPiped = true;
-
-    return ret;
-  };
-
-  process.nextTick(() => {
-    if (!proc.stdin.isPiped) {
-      process.stdin.pipe(proc.stdin);
-      proc.stdin.isPiped = true;
+    if (typeof v === 'function') {
+      return v.bind(exec);
     }
 
-    ['stdout', 'stderr'].forEach(x => {
-      if (proc[x].isPiped) {
-        return;
-      }
-
-      proc[x].pipe(process[x]);
-      proc[x].isPiped = true;
-    });
-  });
-
-  return new Proxy(p, {
-    get: (_, k) => {
-      if (k === 'then') {
-        return p.then.bind(p);
-      }
-
-      return p[k] || ((...args) => p.pipe(k, ...args));
-    },
-  });
-};
-
-exec.errExit = true;
-
-let lastCmdSet = [];
-
-exec.setGlobals = async () => {
-  let compgen = exec('bash', '-c', 'compgen -c');
-  let cmdSet = (await compgen.toString()).split('\n');
-
-  let newCmds = cmdSet.filter(x => !lastCmdSet.includes(x));
-  let lostCmds = cmdSet.filter(x => lastCmdSet.includes(x));
-
-  newCmds.forEach(x => {
-    global[x] = (...args) => exec(x, ...args);
-  });
-
-  lostCmds.forEach(x => delete global[x]);
-
-  lastCmdSet = cmdSet;
-};
-
-module.exports = new Proxy(exec, {
-  get: (_, k) => {
-    if (k === 'then') {
-      return p.then.bind(p);
-    }
-
-    return exec[k] || ((...args) => exec(k, ...args));
+    return exec[k] || ((...args) => exec.pipe(k, ...args));
   },
-});
+};
+
+class BlastoiseProcExec extends Promise {
+  constructor(cmd, args) {
+    super(resolve => resolve());
+
+    this.cmd = cmd;
+    this.args = expandArgs(args);
+
+    this.spawnConf = {
+      stdin: 'inherit',
+      stdout: 'inherit',
+      stderr: 'inherit',
+    };
+
+    this.proc = null;
+  }
+
+  pipe(target, ...rest) {
+    if (typeof target === 'string') {
+      return this.pipeExec(target, ...rest);
+    }
+
+    throw new Error(`Not implemented`);
+  }
+
+  pipeExec(cmd, ...args) {
+    let eNext = exec(cmd, ...args);
+
+    this.spawnConf.stdout = eNext;
+    eNext.spawnConf.stdin = this;
+
+    return eNext;
+  }
+
+  start() {
+    if (this.promise) {
+      return this.promise;
+    }
+
+    let { stdin, stdout, stderr } = this.spawnConf;
+
+    let pOthers = [];
+
+    if (typeof stdin === 'object') {
+      stdin.spawnConf.stdout = 'pipe';
+      pOthers.push(stdin.start());
+    }
+
+    let proc = this.proc = cp.spawn(this.cmd, this.args, {
+      stdio: [stdin, stdout, stderr].map(x => {
+        if (typeof x !== 'object') {
+          return x;
+        }
+
+        return 'pipe';
+      }),
+    });
+
+    if (typeof stdin === 'object') {
+      stdin.proc.stdout.pipe(proc.stdin);
+    }
+
+    let pProcDone = new Promise((resolve, reject) => {
+      proc.on('error', reject);
+
+      proc.on('exit', (code, sig) => {
+        if (!exec.throwOnError) {
+          return resolve(code !== null ? code : sig);
+        }
+
+        if (code === 0) {
+          return resolve(code);
+        }
+
+        if (code === null) {
+          return reject(new Error(
+            `${this.cmd} terminated by signal ${sig}`
+          ));
+        }
+
+        reject(new Error(
+          `${this.cmd} exitted with code ${code}`
+        ));
+      });
+    });
+
+    let pPipesFinished = ['stdout', 'stderr'].map(
+      x => new Promise((resolve, reject) => {
+        if (!proc[x]) {
+          return resolve();
+        }
+
+        proc[x].on('error', reject);
+        proc[x].on('finish', resolve);
+      })
+    );
+
+    let pAllDone = Promise.all([
+      pProcDone, ...pPipesFinished, ...pOthers,
+    ])
+    .then(xs => xs[0]);
+
+    return this.promise = new Proxy(
+      pAllDone, instanceProxyHandlers
+    );
+  }
+
+  appendTo(path) {
+    this.spawnConf.stdout = 'pipe';
+
+    return Promise.all([
+      this.start(), new Promise((resolve, reject) => {
+        let fileStream = fs.createWriteStream(path, {
+          flags: 'a',
+        });
+
+        this.proc.stdout.pipe(fileStream);
+
+        fileStream.on('error', reject);
+        fileStream.on('finish', resolve);
+      }),
+    ]);
+  }
+
+  toString() {
+    this.spawnConf.stdout = 'pipe';
+
+    return Promise.all([
+      this.start(),
+      streamToString(this.proc.stdout),
+    ])
+    .then(xs => xs[1]);
+  }
+
+  then(...args) {
+    return this.start().then(...args);
+  }
+
+  catch(...args) {
+    return this.start().catch(...args);
+  }
+}
+
+let exec = (cmd, ...args) =>
+  new Proxy(new BlastoiseProcExec(cmd, args), instanceProxyHandlers);
+
+exec.throwOnError = true;
+
+{
+  let lastCmdSet = [];
+
+  exec.setGlobals = async () => {
+    let compgen = exec('bash', '-c', 'compgen -c');
+    let cmdSet = (await compgen.toString()).split('\n');
+
+    let newCmds = cmdSet.filter(x => !lastCmdSet.includes(x));
+    let lostCmds = cmdSet.filter(x => lastCmdSet.includes(x));
+
+    newCmds.forEach(x => {
+      global[x] = (...args) => exec(x, ...args);
+    });
+
+    lostCmds.forEach(x => delete global[x]);
+
+    lastCmdSet = cmdSet;
+  };
+}
+
+{
+  let rootProxyHandlers = {
+    get: (exec, k) => {
+      let v = exec[k];
+
+      if (typeof v === 'function') {
+        return v.bind(exec);
+      }
+
+      return exec[k] || ((...args) => exec(k, ...args));
+    },
+  };
+
+  module.exports = new Proxy(exec, rootProxyHandlers);
+}
