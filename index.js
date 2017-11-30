@@ -1,5 +1,6 @@
 let cp = require('child_process');
 let fs = require('fs');
+let { Readable } = require('stream');
 
 let PLazy = require('p-lazy');
 let streamToString = require('stream-to-string');
@@ -49,7 +50,7 @@ class BlastoiseProcExec extends Promise {
 
     let pPrevExec;
 
-    if (typeof stdin === 'object') {
+    if (stdin instanceof BlastoiseProcExec) {
       stdin.spawnConf.stdout = 'pipe';
       pPrevExec = stdin.start();
     }
@@ -64,8 +65,11 @@ class BlastoiseProcExec extends Promise {
       }),
     });
 
-    if (typeof stdin === 'object') {
+    if (stdin instanceof BlastoiseProcExec) {
       stdin.proc.stdout.pipe(proc.stdin);
+    }
+    else if (stdin instanceof Readable) {
+      stdin.pipe(proc.stdin);
     }
 
     let pProcDone = new Promise((resolve, reject) => {
@@ -180,9 +184,41 @@ class BlastoiseProcExec extends Promise {
   }
 }
 
+class BlastoiseReadStream {
+  constructor(stream) {
+    this.stream = stream;
+  }
+
+  pipe(target, ...rest) {
+    if (typeof target === 'string') {
+      return this.pipeExec(target, ...rest);
+    }
+
+    throw new Error(`Not implemented`);
+  }
+
+  pipeExec(cmd, ...args) {
+    let eNext = exec(cmd, ...args);
+    eNext.spawnConf.stdin = this.stream;
+
+    return eNext;
+  }
+}
+
 let exec = (cmd, ...args) => proxyWrap.instance(
   new BlastoiseProcExec(cmd, args)
 );
+
+exec.fromString = str => {
+  let stream = new Readable();
+
+  stream.push(str);
+  stream.push(null);
+
+  return proxyWrap.instance(
+    new BlastoiseReadStream(stream)
+  );
+};
 
 exec.throwOnError = true;
 
