@@ -1,7 +1,7 @@
 {
   "name": "blastoise-shell",
   "version": "1.0.0",
-  "description": "A powerful shell interface for Node",
+  "description": "Async shell-like child process management for NodeJS with powerful piping",
   "main": "lib.js",
   "repository": {
     "type": "git",
