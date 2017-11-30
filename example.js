@@ -40,8 +40,6 @@ async function main() {
   await echo(`$ git diff | head -n 1`);
   await git('diff', { cached: false }).head({ n: 1 });
   await echo();
-
-  process.exit();
 }
 
 main().catch(console.error);
