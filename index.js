@@ -228,6 +228,7 @@ let enumCmds = require('./enumCmds');
 
 {
   let lastCmdSet = [];
+  let globalsBlacklist = new Set();
 
   exec.setGlobals = async () => {
     let cmdSet = await enumCmds();
@@ -237,14 +238,20 @@ let enumCmds = require('./enumCmds');
 
     newCmds.forEach(x => {
       if (global[x]) {
-        cmdSet.splice(cmdSet.indexOf(x), 1);
+        globalsBlacklist.add(x);
         return;
       }
 
       global[x] = (...args) => exec(x, ...args);
     });
 
-    lostCmds.forEach(x => delete global[x]);
+    lostCmds.forEach(x => {
+      if (globalsBlacklist.has(x)) {
+        return;
+      }
+
+      delete global[x];
+    });
 
     lastCmdSet = cmdSet;
   };
