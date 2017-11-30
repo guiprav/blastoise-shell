@@ -203,6 +203,40 @@ class BlastoiseReadStream {
 
     return eNext;
   }
+
+  appendTo(path) {
+    return new PLazy((resolve, reject) => {
+      let fileStream = fs.createWriteStream(path, {
+        flags: 'a',
+      });
+
+      this.stream.pipe(fileStream);
+
+      fileStream.on('error', reject);
+      fileStream.on('finish', resolve);
+    });
+  }
+
+  writeTo(path) {
+    return new PLazy((resolve, reject) => {
+      let fileStream = fs.createWriteStream(path);
+
+      this.stream.pipe(fileStream);
+
+      fileStream.on('error', reject);
+      fileStream.on('finish', resolve);
+    });
+  }
+
+  toString() {
+    return new PLazy(
+      resolve => resolve(streamToString(this.stream))
+    );
+  }
+
+  errToString() {
+    return new PLazy(resolve => resolve(''));
+  }
 }
 
 let exec = (cmd, ...args) => proxyWrap.instance(
