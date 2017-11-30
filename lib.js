@@ -1,6 +1,7 @@
 let cp = require('child_process');
 let fs = require('fs');
 
+let PLazy = require('p-lazy');
 let streamToString = require('stream-to-string');
 
 let expandArgs = require('./expandArgs');
@@ -124,30 +125,63 @@ class BlastoiseProcExec extends Promise {
   }
 
   appendTo(path) {
-    this.spawnConf.stdout = 'pipe';
+    return new PLazy(resolve => {
+      this.spawnConf.stdout = 'pipe';
 
-    return Promise.all([
-      this.start(), new Promise((resolve, reject) => {
-        let fileStream = fs.createWriteStream(path, {
-          flags: 'a',
-        });
+      resolve(Promise.all([
+        this.start(), new Promise((resolve, reject) => {
+          let fileStream = fs.createWriteStream(path, {
+            flags: 'a',
+          });
 
-        this.proc.stdout.pipe(fileStream);
+          this.proc.stdout.pipe(fileStream);
 
-        fileStream.on('error', reject);
-        fileStream.on('finish', resolve);
-      }),
-    ]);
+          fileStream.on('error', reject);
+          fileStream.on('finish', resolve);
+        }),
+      ]));
+    });
+  }
+
+  writeTo(path) {
+    return new PLazy(resolve => {
+      this.spawnConf.stdout = 'pipe';
+
+      resolve(Promise.all([
+        this.start(), new Promise((resolve, reject) => {
+          let fileStream = fs.createWriteStream(path);
+
+          this.proc.stdout.pipe(fileStream);
+
+          fileStream.on('error', reject);
+          fileStream.on('finish', resolve);
+        }),
+      ]));
+    });
   }
 
   toString() {
-    this.spawnConf.stdout = 'pipe';
+    return new PLazy(resolve => {
+      this.spawnConf.stdout = 'pipe';
 
-    return Promise.all([
-      this.start(),
-      streamToString(this.proc.stdout),
-    ])
-    .then(xs => xs[1]);
+      resolve(Promise.all([
+        this.start(),
+        streamToString(this.proc.stdout),
+      ])
+      .then(xs => xs[1]));
+    });
+  }
+
+  errToString() {
+    return new PLazy(resolve => {
+      this.spawnConf.stderr = 'pipe';
+
+      resolve(Promise.all([
+        this.start(),
+        streamToString(this.proc.stderr),
+      ])
+      .then(xs => xs[1]));
+    });
   }
 
   then(...args) {

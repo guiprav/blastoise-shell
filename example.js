@@ -1,6 +1,8 @@
 let sh = require('./lib');
 
 async function main() {
+  // This is never run due to lazy promise behavior:
+  /* await */ sh.invalidCommand().toString();
 
   await sh.echo(`$ echo "Hello, world." | sed "s/world/my friend/"`);
   await sh.echo('Hello, world.').sed('s/world/my friend/');
