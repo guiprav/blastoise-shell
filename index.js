@@ -29,6 +29,10 @@ class BlastoiseProcExec extends Promise {
       return this.pipeExec(target, ...rest);
     }
 
+    if (typeof target === 'function') {
+      return target(this, ...rest);
+    }
+
     throw new Error(`Not implemented`);
   }
 
