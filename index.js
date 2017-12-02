@@ -31,7 +31,7 @@ class BlastoiseProcExec extends Promise {
     }
 
     if (typeof target === 'function') {
-      return target(this, ...rest);
+      return target(proxyWrap.instance(this), ...rest);
     }
 
     throw new Error(`Not implemented`);
