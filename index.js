@@ -7,6 +7,7 @@ let streamToString = require('stream-to-string');
 
 let expandArgs = require('./expandArgs');
 let proxyWrap = require('./proxyWrap');
+let streamForEach = require('./streamForEach');
 
 class BlastoiseProcExec extends Promise {
   constructor(cmd, args) {
@@ -165,6 +166,50 @@ class BlastoiseProcExec extends Promise {
       ])
       .then(xs => xs[1]));
     });
+  }
+
+  forEach(fn) {
+    return new PLazy(resolve => {
+      this.spawnConf.stdout = 'pipe';
+
+      resolve(Promise.all([
+        this.start(),
+        streamForEach(this.proc.stdout, fn),
+      ])
+      .then(xs => xs[1]));
+    });
+  }
+
+  map(fn) {
+    return this.forEach(x => Promise.resolve(
+      fn(x)
+    ));
+  }
+
+  get lines() {
+    return this.map(x => x);
+  }
+
+  errForEach(fn) {
+    return new PLazy(resolve => {
+      this.spawnConf.stderr = 'pipe';
+
+      resolve(Promise.all([
+        this.start(),
+        streamForEach(this.proc.stderr, fn),
+      ])
+      .then(xs => xs[1]));
+    });
+  }
+
+  errMap(fn) {
+    return this.errForEach(x => Promise.resolve(
+      fn(x)
+    ));
+  }
+
+  get errLines() {
+    return this.errMap(x => x);
   }
 
   errToString() {
