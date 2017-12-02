@@ -17,6 +17,16 @@ module.exports = args => args.map(x => {
       return opt;
     }
 
+    if (Array.isArray(val)) {
+      let ret = [];
+
+      for (let v of val) {
+        ret.push(opt, v);
+      }
+
+      return ret;
+    }
+
     return [opt, val];
   });
 })
