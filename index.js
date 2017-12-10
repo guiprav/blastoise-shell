@@ -50,7 +50,7 @@ function cantStart(sh, why) {
   );
 }
 
-let inheritedProps = ['_throwOnError'];
+let inheritedProps = ['_throw'];
 
 class BlastoiseShell extends Promise {
   constructor(cmd, ...args) {
@@ -59,7 +59,7 @@ class BlastoiseShell extends Promise {
     this.cmd = cmd || null;
     this.args = expandArgs(args);
 
-    this._throwOnError = true;
+    this._throw = true;
 
     if (this.cmd) {
       this.spawnConf = {
@@ -72,16 +72,20 @@ class BlastoiseShell extends Promise {
     this.proc = null;
   }
 
-  throwOnError(val) {
+  get throw() {
     let next = new BlastoiseShell();
 
     this.pipeTo(next);
+    next._throw = true;
 
-    if (val === undefined) {
-      val = true;
-    }
+    return proxyWrap(next);
+  }
 
-    next._throwOnError = !!val;
+  get noThrow() {
+    let next = new BlastoiseShell();
+
+    this.pipeTo(next);
+    next._throw = false;
 
     return proxyWrap(next);
   }
@@ -223,7 +227,7 @@ class BlastoiseShell extends Promise {
 
     let pProcDone = new Promise((resolve, reject) => {
       proc.on('error', err => {
-        if (!this._throwOnError) {
+        if (!this._throw) {
           return resolve(err.code);
         }
 
@@ -231,7 +235,7 @@ class BlastoiseShell extends Promise {
       });
 
       proc.on('exit', (code, sig) => {
-        if (!this._throwOnError) {
+        if (!this._throw) {
           return resolve(code !== null ? code : sig);
         }
 
@@ -396,7 +400,7 @@ class BlastoiseShell extends Promise {
     return proxyWrap(next);
   }
 
-  errToOut() {
+  get withErr() {
     let next = new BlastoiseShell(this.cmd, ...this.args);
 
     this.spawnConf.stdout = next;
