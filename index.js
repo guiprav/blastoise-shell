@@ -185,15 +185,23 @@ class BlastoiseShell extends Promise {
     }
 
     if (this.redirect) {
-      this.proc = {
-        pid: stdin.proc.pid,
+      this.promise = pStdinShell;
 
-        stdout: es.merge(this.redirect.map(
-          x => stdin.proc[x]
-        )),
-      };
+      let redirectedStdout = es.merge(this.redirect.map(
+        x => stdin.proc[x]
+      ));
 
-      return this.promise = pStdinShell;
+      if (stdout === 'inherit') {
+        redirectedStdout.pipe(process.stdout);
+      }
+      else {
+        this.proc = {
+          pid: stdin.proc.pid,
+          stdout: redirectedStdout,
+        };
+      }
+
+      return this.promise;
     }
 
     let proc = this.proc = cp.spawn(this.cmd, this.args, {
