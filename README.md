@@ -4,34 +4,29 @@ Blastoise Shell is an easy way to setup child process
 pipelines, execute them, and easily interact with their
 standard streams. A lot like Bash, but using Node.
 
-[Documentation](https://github.com/n2liquid/blastoise-shell/wiki/Where-is-the-documentation%3F),
-[example.js](example.js) output:
+Check out the [documentation](https://github.com/n2liquid/blastoise-shell/wiki/Where-is-the-documentation%3F).
 
-```
-$ echo "Hello, world." | sed "s/world/my friend/"
-Hello, my friend.
+Example:
+```js
+let { cat, echo, rm, vim } = require('blastoise-shell');
 
-$ echo "Hello, world." >> hellos
+async function main() {
+    let fileName = 'hello.txt';
 
-$ vim hellos
+    await echo(`Hello, world!`)
+        .map(x => x.replace('Hello', 'Hi'))
+        .sed('s/world/folks/')
+        .writeTo(fileName);
 
-$ cat hellos # With console.log(await cat(...).toString())
-Hello, world.
-This line was manually added using vim.
+    await vim(fileName);
 
-$ cat example.js | grep example
-  await echo(`$ cat example.js | grep example`);
-  await cat('example.js').grep('example');
+    await echo(`File contents after editing:`);
+    await cat(fileName);
 
-$ notify-send "i hackz ur computerz"
+    await rm(fileName);
+}
 
-$ git show HEAD | head -n 1
-commit 8d0fff98ba15b792225dfe8f0484f74db6a64a0d
-
-$ git diff --cached | head -n 1
-
-$ git diff | head -n 1
-diff --git a/example.js b/example.js
+main().catch(console.error);
 ```
 
 ## License
