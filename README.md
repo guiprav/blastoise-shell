@@ -1,6 +1,10 @@
 # blastoise-shell
 
-No time to explain, code is worth a thousand words.
+Blastoise Shell is an easy way to setup child process
+pipelines, execute them, and easily interact with their
+standard streams, kind of like Bash, but using Node.
+
+[Documentation](https://github.com/n2liquid/blastoise-shell/wiki/Where-is-the-documentation%3F).
 
 [example.js](example.js) output:
 
