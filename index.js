@@ -1,4 +1,5 @@
 let cp = require('child_process');
+let es = require('event-stream');
 let fs = require('fs');
 let isRunning = require('is-running');
 let { Readable } = require('stream');
@@ -85,13 +86,24 @@ class BlastoiseShell extends Promise {
     return proxyWrap(next);
   }
 
+  exec(cmd, ...args) {
+    if (this.proc) {
+      cantPipeFrom(this, msg.procAlreadyStarted);
+    }
+
+    let next = new BlastoiseShell(cmd, ...args);
+    this.pipeTo(next);
+
+    return proxyWrap(next);
+  }
+
   pipeTo(dest, ...args) {
     if (this.proc) {
       cantPipeFrom(this, msg.procAlreadyStarted);
     }
 
     if (typeof dest === 'string') {
-      return this.pipeToExec(dest, ...args);
+      return this.exec(dest, ...args);
     }
 
     if (typeof dest === 'function') {
@@ -103,17 +115,6 @@ class BlastoiseShell extends Promise {
     }
 
     cantPipeTo(dest, msg.invalidDest);
-  }
-
-  pipeToExec(cmd, ...args) {
-    if (this.proc) {
-      cantPipeFrom(this, msg.procAlreadyStarted);
-    }
-
-    let next = new BlastoiseShell(cmd, ...args);
-    this.pipeTo(next);
-
-    return proxyWrap(next);
   }
 
   pipeToShell(next) {
@@ -162,7 +163,10 @@ class BlastoiseShell extends Promise {
     if (this.redirect) {
       this.proc = {
         pid: stdin.proc.pid,
-        stdout: stdin.proc[this.redirect],
+
+        stdout: es.merge(this.redirect.map(
+          x => stdin.proc[x]
+        )),
       };
 
       return this.promise = pStdinShell;
@@ -255,7 +259,7 @@ class BlastoiseShell extends Promise {
           fileStream.on('error', reject);
           fileStream.on('finish', resolve);
         }),
-      ]));
+      ]).then(xs => xs[1]));
     });
   }
 
@@ -276,7 +280,7 @@ class BlastoiseShell extends Promise {
           fileStream.on('error', reject);
           fileStream.on('finish', resolve);
         }),
-      ]));
+      ]).then(xs => xs[1]));
     });
   }
 
@@ -328,7 +332,19 @@ class BlastoiseShell extends Promise {
     this.spawnConf.stderr = next;
 
     next.spawnConf.stdin = this;
-    next.redirect = 'stderr';
+    next.redirect = ['stderr'];
+
+    return proxyWrap(next);
+  }
+
+  errToOut() {
+    let next = new BlastoiseShell(this.cmd, ...this.args);
+
+    this.spawnConf.stdout = next;
+    this.spawnConf.stderr = next;
+
+    next.spawnConf.stdin = this;
+    next.redirect = ['stdout', 'stderr'];
 
     return proxyWrap(next);
   }
