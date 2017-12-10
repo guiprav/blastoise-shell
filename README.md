@@ -1,12 +1,17 @@
-# blastoise-shell
+# Blastoise Shell
 
 Blastoise Shell is an easy way to setup child process
 pipelines, execute them, and easily interact with their
 standard streams. A lot like Bash, but using Node.
 
-Check out the [documentation](https://github.com/n2liquid/blastoise-shell/wiki/Where-is-the-documentation%3F).
+Installation:
 
-Example:
+```sh
+$ npm install --save blastoise-shell
+```
+
+Quick example:
+
 ```js
 let { cat, echo, rm, vim } = require('blastoise-shell');
 
@@ -29,10 +34,12 @@ async function main() {
 main().catch(console.error);
 ```
 
+Check out the [documentation](https://github.com/n2liquid/blastoise-shell/wiki/Where-is-the-documentation%3F).
+
 ## License
 
-blastoise-shell is free software: you can redistribute it and/or modify it under the terms of the [MIT license](COPYING).
+Blastoise Shell is free software: you can redistribute it and/or modify it under the terms of the [MIT license](COPYING).
 
 ## Exclusion of warranty
 
-blastoise-shell is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [COPYING](COPYING) for more details.
+Blastoise Shell is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [COPYING](COPYING) for more details.
