@@ -16,7 +16,9 @@
   "dependencies": {
     "executable": "^4.1.0",
     "glob": "^7.1.2",
+    "is-running": "^2.1.0",
     "line-input-stream": "^1.0.1",
+    "longjohn": "^0.2.12",
     "p-lazy": "^1.0.0",
     "stream-to-string": "^1.1.0"
   }

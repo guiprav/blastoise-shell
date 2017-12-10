@@ -1,5 +1,6 @@
 let cp = require('child_process');
 let fs = require('fs');
+let isRunning = require('is-running');
 let { Readable } = require('stream');
 
 let PLazy = require('p-lazy');
@@ -9,41 +10,131 @@ let expandArgs = require('./expandArgs');
 let proxyWrap = require('./proxyWrap');
 let streamForEach = require('./streamForEach');
 
-class BlastoiseProcExec extends Promise {
-  constructor(cmd, args) {
+class BlastoiseError extends Error {
+}
+
+let msg = {
+  invalidDest: `Invalid pipe destination`,
+  invalidShell: `Invalid shell`,
+  //invalidSrc: `Invalid pipe source`,
+  procAlreadyDead: `Process already dead`,
+  procAlreadyStarted: `Process already started`,
+};
+
+function cantPipeFrom(src, why) {
+  if (src instanceof BlastoiseShell) {
+    src = src.cmd || 'null shell';
+  }
+
+  throw new BlastoiseError(
+    `Can't pipe from ${src}: ${why}`
+  );
+}
+
+function cantPipeTo(dest, why) {
+  if (dest instanceof BlastoiseShell) {
+    dest = dest.cmd || 'null shell';
+  }
+
+  throw new BlastoiseError(
+    `Can't pipe to ${dest}: ${why}`
+  );
+}
+
+function cantStart(sh, why) {
+  sh = sh.cmd || 'null shell';
+
+  throw new BlastoiseError(
+    `Can't start ${sh}: ${why}`
+  );
+}
+
+let inheritedProps = ['_throwOnError'];
+
+class BlastoiseShell extends Promise {
+  constructor(cmd, ...args) {
     super(resolve => resolve());
 
-    this.cmd = cmd;
+    this.cmd = cmd || null;
     this.args = expandArgs(args);
 
-    this.spawnConf = {
-      stdin: 'inherit',
-      stdout: 'inherit',
-      stderr: 'inherit',
-    };
+    this._throwOnError = true;
+
+    if (this.cmd) {
+      this.spawnConf = {
+        stdin: 'inherit',
+        stdout: 'inherit',
+        stderr: 'inherit',
+      };
+    }
 
     this.proc = null;
   }
 
-  pipe(target, ...rest) {
-    if (typeof target === 'string') {
-      return this.pipeExec(target, ...rest);
+  throwOnError(val) {
+    let next = new BlastoiseShell();
+
+    this.pipeTo(next);
+
+    if (val === undefined) {
+      val = true;
     }
 
-    if (typeof target === 'function') {
-      return target(proxyWrap.instance(this), ...rest);
-    }
+    next._throwOnError = !!val;
 
-    throw new Error(`Not implemented`);
+    return proxyWrap(next);
   }
 
-  pipeExec(cmd, ...args) {
-    let eNext = exec(cmd, ...args);
+  pipeTo(dest, ...args) {
+    if (this.proc) {
+      cantPipeFrom(this, msg.procAlreadyStarted);
+    }
 
-    this.spawnConf.stdout = eNext;
-    eNext.spawnConf.stdin = this;
+    if (typeof dest === 'string') {
+      return this.pipeToExec(dest, ...args);
+    }
 
-    return eNext;
+    if (typeof dest === 'function') {
+      return dest(this, ...args);
+    }
+
+    if (dest instanceof BlastoiseShell) {
+      return this.pipeToShell(dest);
+    }
+
+    cantPipeTo(dest, msg.invalidDest);
+  }
+
+  pipeToExec(cmd, ...args) {
+    if (this.proc) {
+      cantPipeFrom(this, msg.procAlreadyStarted);
+    }
+
+    let next = new BlastoiseShell(cmd, ...args);
+    this.pipeTo(next);
+
+    return proxyWrap(next);
+  }
+
+  pipeToShell(next) {
+    if (this.proc) {
+      cantPipeFrom(this, msg.procAlreadyStarted);
+    }
+
+    if (next.proc) {
+      cantPipeTo(next, msg.procAlreadyStarted);
+    }
+
+    for (let k of inheritedProps) {
+      next[k] = this[k];
+    }
+
+    if (this.cmd) {
+      this.spawnConf.stdout = next;
+      next.spawnConf.stdin = this;
+    }
+
+    return next;
   }
 
   start() {
@@ -51,26 +142,43 @@ class BlastoiseProcExec extends Promise {
       return this.promise;
     }
 
+    if (!this.cmd) {
+      cantStart(this, msg.invalidShell);
+    }
+
     let { stdin, stdout, stderr } = this.spawnConf;
+    delete this.spawnConf;
 
-    let pPrevExec;
+    let pStdinShell = null;
 
-    if (stdin instanceof BlastoiseProcExec) {
-      stdin.spawnConf.stdout = 'pipe';
-      pPrevExec = stdin.start();
+    if (stdin instanceof BlastoiseShell) {
+      pStdinShell = stdin.start();
+
+      if (!isRunning(stdin.proc.pid)) {
+        cantPipeFrom(stdin, msg.procAlreadyDead);
+      }
+    }
+
+    if (this.redirect) {
+      this.proc = {
+        pid: stdin.proc.pid,
+        stdout: stdin.proc[this.redirect],
+      };
+
+      return this.promise = pStdinShell;
     }
 
     let proc = this.proc = cp.spawn(this.cmd, this.args, {
       stdio: [stdin, stdout, stderr].map(x => {
-        if (typeof x !== 'object') {
-          return x;
+        if (typeof x === 'object') {
+          return 'pipe';
         }
 
-        return 'pipe';
+        return x;
       }),
     });
 
-    if (stdin instanceof BlastoiseProcExec) {
+    if (pStdinShell) {
       stdin.proc.stdout.pipe(proc.stdin);
     }
     else if (stdin instanceof Readable) {
@@ -78,10 +186,16 @@ class BlastoiseProcExec extends Promise {
     }
 
     let pProcDone = new Promise((resolve, reject) => {
-      proc.on('error', reject);
+      proc.on('error', err => {
+        if (!this._throwOnError) {
+          return resolve(err.code);
+        }
+
+        reject(err);
+      });
 
       proc.on('exit', (code, sig) => {
-        if (!exec.throwOnError) {
+        if (!this._throwOnError) {
           return resolve(code !== null ? code : sig);
         }
 
@@ -90,38 +204,44 @@ class BlastoiseProcExec extends Promise {
         }
 
         if (code === null) {
-          return reject(new Error(
+          return reject(new BlastoiseError(
             `${this.cmd} terminated by signal ${sig}`
           ));
         }
 
-        reject(new Error(
+        reject(new BlastoiseError(
           `${this.cmd} exitted with code ${code}`
         ));
       });
     });
 
-    let pPipesFinished = ['stdout', 'stderr'].map(
-      x => new Promise((resolve, reject) => {
-        if (!proc[x]) {
-          return resolve();
-        }
+    let pPipesFinished = Promise.all(
+      ['stdout', 'stderr'].map(x => new Promise(
+        (resolve, reject) => {
+          if (!proc[x]) {
+            return resolve();
+          }
 
-        proc[x].on('error', reject);
-        proc[x].on('finish', resolve);
-      })
+          proc[x].on('error', reject);
+          proc[x].on('finish', resolve);
+        }
+      ))
     );
 
-    let pAllDone = Promise.all([
-      pProcDone, ...pPipesFinished, pPrevExec,
+    this.promise = Promise.all([
+      pProcDone, pPipesFinished, pStdinShell,
     ])
     .then(xs => xs[0]);
 
-    return this.promise = pAllDone;
+    return this.promise;
   }
 
   appendTo(path) {
     return new PLazy(resolve => {
+      if (this.proc) {
+        cantPipeFrom(this, msg.procAlreadyStarted);
+      }
+
       this.spawnConf.stdout = 'pipe';
 
       resolve(Promise.all([
@@ -141,6 +261,10 @@ class BlastoiseProcExec extends Promise {
 
   writeTo(path) {
     return new PLazy(resolve => {
+      if (this.proc) {
+        cantPipeFrom(this, msg.procAlreadyStarted);
+      }
+
       this.spawnConf.stdout = 'pipe';
 
       resolve(Promise.all([
@@ -158,6 +282,10 @@ class BlastoiseProcExec extends Promise {
 
   toString() {
     return new PLazy(resolve => {
+      if (this.proc) {
+        cantPipeFrom(this, msg.procAlreadyStarted);
+      }
+
       this.spawnConf.stdout = 'pipe';
 
       resolve(Promise.all([
@@ -170,6 +298,10 @@ class BlastoiseProcExec extends Promise {
 
   forEach(fn) {
     return new PLazy(resolve => {
+      if (this.proc) {
+        cantPipeFrom(this, msg.procAlreadyStarted);
+      }
+
       this.spawnConf.stdout = 'pipe';
 
       resolve(Promise.all([
@@ -190,38 +322,15 @@ class BlastoiseProcExec extends Promise {
     return this.map(x => x);
   }
 
-  errForEach(fn) {
-    return new PLazy(resolve => {
-      this.spawnConf.stderr = 'pipe';
+  get err() {
+    let next = new BlastoiseShell(this.cmd, ...this.args);
 
-      resolve(Promise.all([
-        this.start(),
-        streamForEach(this.proc.stderr, fn),
-      ])
-      .then(xs => xs[1]));
-    });
-  }
+    this.spawnConf.stderr = next;
 
-  errMap(fn) {
-    return this.errForEach(x => Promise.resolve(
-      fn(x)
-    ));
-  }
+    next.spawnConf.stdin = this;
+    next.redirect = 'stderr';
 
-  get errLines() {
-    return this.errMap(x => x);
-  }
-
-  errToString() {
-    return new PLazy(resolve => {
-      this.spawnConf.stderr = 'pipe';
-
-      resolve(Promise.all([
-        this.start(),
-        streamToString(this.proc.stderr),
-      ])
-      .then(xs => xs[1]));
-    });
+    return proxyWrap(next);
   }
 
   then(...args) {
@@ -233,109 +342,4 @@ class BlastoiseProcExec extends Promise {
   }
 }
 
-class BlastoiseReadStream {
-  constructor(stream) {
-    this.stream = stream;
-  }
-
-  pipe(target, ...rest) {
-    if (typeof target === 'string') {
-      return this.pipeExec(target, ...rest);
-    }
-
-    throw new Error(`Not implemented`);
-  }
-
-  pipeExec(cmd, ...args) {
-    let eNext = exec(cmd, ...args);
-    eNext.spawnConf.stdin = this.stream;
-
-    return eNext;
-  }
-
-  appendTo(path) {
-    return new PLazy((resolve, reject) => {
-      let fileStream = fs.createWriteStream(path, {
-        flags: 'a',
-      });
-
-      this.stream.pipe(fileStream);
-
-      fileStream.on('error', reject);
-      fileStream.on('finish', resolve);
-    });
-  }
-
-  writeTo(path) {
-    return new PLazy((resolve, reject) => {
-      let fileStream = fs.createWriteStream(path);
-
-      this.stream.pipe(fileStream);
-
-      fileStream.on('error', reject);
-      fileStream.on('finish', resolve);
-    });
-  }
-
-  toString() {
-    return new PLazy(
-      resolve => resolve(streamToString(this.stream))
-    );
-  }
-
-  errToString() {
-    return new PLazy(resolve => resolve(''));
-  }
-}
-
-let exec = (cmd, ...args) => proxyWrap.instance(
-  new BlastoiseProcExec(cmd, args)
-);
-
-exec.fromString = str => {
-  let stream = new Readable();
-
-  stream.push(str);
-  stream.push(null);
-
-  return proxyWrap.instance(
-    new BlastoiseReadStream(stream)
-  );
-};
-
-exec.throwOnError = true;
-
-module.exports = proxyWrap.root(exec);
-
-let enumCmds = require('./enumCmds');
-
-{
-  let lastCmdSet = [];
-  let globalsBlacklist = new Set();
-
-  exec.setGlobals = async () => {
-    let cmdSet = await enumCmds();
-
-    let newCmds = cmdSet.filter(x => !lastCmdSet.includes(x));
-    let lostCmds = cmdSet.filter(x => lastCmdSet.includes(x));
-
-    newCmds.forEach(x => {
-      if (global[x]) {
-        globalsBlacklist.add(x);
-        return;
-      }
-
-      global[x] = (...args) => exec(x, ...args);
-    });
-
-    lostCmds.forEach(x => {
-      if (globalsBlacklist.has(x)) {
-        return;
-      }
-
-      delete global[x];
-    });
-
-    lastCmdSet = cmdSet;
-  };
-}
+module.exports = proxyWrap(new BlastoiseShell());

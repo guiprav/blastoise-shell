@@ -1,23 +1,15 @@
-exports.instance = exec => new Proxy(exec, {
+module.exports = sh => new Proxy(sh, {
   get: (_, k) => {
-    let v = exec[k];
+    let v = sh[k];
 
     if (typeof v === 'function') {
-      return v.bind(exec);
+      return v.bind(sh);
     }
 
-    return exec[k] || ((...args) => exec.pipe(k, ...args));
-  },
-});
-
-exports.root = exec => new Proxy(exec, {
-  get: (_, k) => {
-    let v = exec[k];
-
-    if (typeof v === 'function') {
-      return v.bind(exec);
+    if (v !== undefined) {
+      return v;
     }
 
-    return exec[k] || ((...args) => exec(k, ...args));
+    return ((...args) => sh.pipeTo(k, ...args));
   },
 });
