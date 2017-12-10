@@ -2,6 +2,7 @@ let cp = require('child_process');
 let es = require('event-stream');
 let fs = require('fs');
 let isRunning = require('is-running');
+let split = require('split');
 let { Readable } = require('stream');
 
 let PLazy = require('p-lazy');
@@ -160,20 +161,27 @@ class BlastoiseShell extends Promise {
     }
 
     if (this.mapFn) {
-      this.proc = {
-        pid: stdin.proc.pid,
+      this.promise = pStdinShell;
 
-        stdout: stdin.proc.stdout
-          .pipe(es.split())
-          .pipe(es.map((x, cb) => {
-            Promise.resolve(this.mapFn(x))
-              .then(y => cb(null, y))
-              .catch(cb);
-          }))
-          .pipe(es.join('\n')),
-      };
+      let mappedStdout = stdin.proc.stdout
+        .pipe(split(null, null, { trailing: false }))
+        .pipe(es.map((x, cb) => {
+          Promise.resolve(this.mapFn(x))
+            .then(y => cb(null, y && `${y}\n`))
+            .catch(cb);
+        }));
 
-      return this.promise = pStdinShell;
+      if (stdout === 'inherit') {
+        mappedStdout.pipe(process.stdout);
+      }
+      else {
+        this.proc = {
+          pid: stdin.proc.pid,
+          stdout: mappedStdout,
+        };
+      }
+
+      return this.promise;
     }
 
     if (this.redirect) {
@@ -340,7 +348,7 @@ class BlastoiseShell extends Promise {
       let pFnRetsAcc = [];
 
       let mapStream = this.proc.stdout
-        .pipe(es.split())
+        .pipe(split(null, null, { trailing: false }))
         .pipe(es.map((ln, cb) => {
           let fnRet = fn(ln);
 
