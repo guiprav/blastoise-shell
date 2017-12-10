@@ -6,7 +6,7 @@ standard streams. A lot like Bash, but using Node.
 
 Installation:
 
-```sh
+```
 $ npm install --save blastoise-shell
 ```
 
@@ -34,7 +34,10 @@ async function main() {
 main().catch(console.error);
 ```
 
-Check out the [documentation](https://github.com/n2liquid/blastoise-shell/wiki/Where-is-the-documentation%3F).
+For a more complete example, check out [example.js](example.js).
+
+For the complete API reference, check out the
+[documentation](https://github.com/n2liquid/blastoise-shell/wiki/Where-is-the-documentation%3F).
 
 ## License
 
