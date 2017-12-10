@@ -1,8 +1,8 @@
 {
   "name": "blastoise-shell",
   "version": "1.0.0",
-  "description": "Async shell-like child process management for NodeJS with powerful piping",
-  "main": "lib.js",
+  "description": "Async shell-like child process pipelines for NodeJS",
+  "main": "index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/n2liquid/blastoise-shell.git"
@@ -15,11 +15,8 @@
   "homepage": "https://github.com/n2liquid/blastoise-shell#readme",
   "dependencies": {
     "event-stream": "^3.3.4",
-    "executable": "^4.1.0",
     "glob": "^7.1.2",
     "is-running": "^2.1.0",
-    "line-input-stream": "^1.0.1",
-    "longjohn": "^0.2.12",
     "p-lazy": "^1.0.0",
     "split": "^1.0.1",
     "stream-to-string": "^1.1.0"
