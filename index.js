@@ -167,10 +167,12 @@ class BlastoiseShell extends Promise {
     if (this.mapFn) {
       this.promise = pStdinShell;
 
+      let i = 0;
+
       let mappedStdout = stdin.proc.stdout
         .pipe(split(null, null, { trailing: false }))
         .pipe(es.map((x, cb) => {
-          Promise.resolve(this.mapFn(x))
+          Promise.resolve(this.mapFn(x, i++))
             .then(y => cb(null, y && `${y}\n`))
             .catch(cb);
         }));
@@ -359,10 +361,12 @@ class BlastoiseShell extends Promise {
 
       let pFnRetsAcc = [];
 
+      let i = 0;
+
       let mapStream = this.proc.stdout
         .pipe(split(null, null, { trailing: false }))
         .pipe(es.map((ln, cb) => {
-          let fnRet = fn(ln);
+          let fnRet = fn(ln, i++);
 
           if (fnRet && fnRet.then) {
             pFnRetsAcc.push(fnRet);
