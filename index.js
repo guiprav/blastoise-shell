@@ -9,7 +9,6 @@ let streamToString = require('stream-to-string');
 
 let expandArgs = require('./expandArgs');
 let proxyWrap = require('./proxyWrap');
-let streamForEach = require('./streamForEach');
 
 class BlastoiseError extends Error {
 }
@@ -160,6 +159,23 @@ class BlastoiseShell extends Promise {
       }
     }
 
+    if (this.mapFn) {
+      this.proc = {
+        pid: stdin.proc.pid,
+
+        stdout: stdin.proc.stdout
+          .pipe(es.split())
+          .pipe(es.map((x, cb) => {
+            Promise.resolve(this.mapFn(x))
+              .then(y => cb(null, y))
+              .catch(cb);
+          }))
+          .pipe(es.join('\n')),
+      };
+
+      return this.promise = pStdinShell;
+    }
+
     if (this.redirect) {
       this.proc = {
         pid: stdin.proc.pid,
@@ -300,30 +316,57 @@ class BlastoiseShell extends Promise {
     });
   }
 
+  map(fn) {
+    let next = new BlastoiseShell(this.cmd, ...this.args);
+
+    this.spawnConf.stdout = next;
+
+    next.spawnConf.stdin = this;
+    next.mapFn = fn;
+
+    return proxyWrap(next);
+  }
+
   forEach(fn) {
-    return new PLazy(resolve => {
+    return new PLazy(async resolve => {
       if (this.proc) {
         cantPipeFrom(this, msg.procAlreadyStarted);
       }
 
       this.spawnConf.stdout = 'pipe';
 
+      let pProc = this.start();
+
+      let pFnRetsAcc = [];
+
+      let mapStream = this.proc.stdout
+        .pipe(es.split())
+        .pipe(es.map((ln, cb) => {
+          let fnRet = fn(ln);
+
+          if (fnRet && fnRet.then) {
+            pFnRetsAcc.push(fnRet);
+          }
+
+          Promise.resolve(fnRet)
+            .then(() => cb())
+            .catch(cb);
+        }));
+
+      let pFnRets = new Promise((resolve, reject) => {
+        mapStream.on('error', reject);
+        mapStream.on('end', resolve);
+      })
+      .then(() => Promise.all(pFnRetsAcc));
+
       resolve(Promise.all([
-        this.start(),
-        streamForEach(this.proc.stdout, fn),
-      ])
-      .then(xs => xs[1]));
+        pProc, pFnRets,
+      ]).then(xs => xs[1]));
     });
   }
 
-  map(fn) {
-    return this.forEach(x => Promise.resolve(
-      fn(x)
-    ));
-  }
-
   get lines() {
-    return this.map(x => x);
+    return this.forEach(x => Promise.resolve(x));
   }
 
   get err() {
