@@ -1,12 +1,18 @@
-let sh = require('.');
+let { netcat } = require('.');
 
 class Server {
   constructor(port) {
     this.stage = 'methodLn';
-    this.headers = {};
+
+    this.reqHeaders = {};
     this.reqBody = '';
 
-    let nc = this.nc = sh.netcat('-l', '-p', port);
+    let nc = netcat('-l', '-p', port);
+
+    // Prevent inheritting Node's stdin.
+    // We need to write to netcat's stdin to respond
+    // to requests.
+    nc.spawnConf.stdin = 'pipe';
 
     let firstLineReceived;
 
@@ -14,20 +20,18 @@ class Server {
       firstLineReceived = resolve;
     });
 
-    this.promise = nc.map((ln, i) => {
+    this.promise = nc.forEach((ln, i) => {
       if (i === 0) {
-        this.res = nc.proc.stdin;
         firstLineReceived();
+        this.res = nc.proc.stdin;
       }
 
-      this[this.stage](ln);
+      return this[this.stage](ln);
     });
-
-    nc.spawnConf.stdin = 'pipe';
   }
 
   get contentLength() {
-    return Number(this.headers['content-length'] || 0);
+    return Number(this.reqHeaders['content-length'] || 0);
   }
 
   respond() {
@@ -73,6 +77,8 @@ class Server {
   }
 
   methodLn(ln) {
+    console.log(ln);
+
     [this.method, this.path] = ln.split(' ');
     this.stage = 'headerLn';
   }
@@ -84,9 +90,9 @@ class Server {
       let [name, val] = ln.split(':')
         .map(x => x.trim());
 
-      this.headers[name.toLowerCase()] = val;
+      this.reqHeaders[name.toLowerCase()] = val;
     }
-    else if (this.headers['content-length']) {
+    else if (this.reqHeaders['content-length']) {
       this.stage = 'contentLn';
     }
     else {
@@ -117,7 +123,13 @@ async function main() {
   while(true) {
     let server = new Server(process.env.PORT || 3000);
 
+    // Log errors.
     server.catch(console.error);
+
+    // As soon as a connection is established, netcat
+    // stops listening for new connections. Wait until
+    // first line of request is received, then loop
+    // (start a new server).
     await server.firstLineReceived;
   }
 }
