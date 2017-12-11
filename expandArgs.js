@@ -1,4 +1,4 @@
-let flatten = require('./flatten');
+let flatten = (a, b) => a.concat(b);
 
 module.exports = args => args.map(x => {
   if (typeof x !== 'object') {
