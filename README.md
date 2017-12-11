@@ -34,7 +34,11 @@ async function main() {
 main().catch(console.error);
 ```
 
-For a more complete example, check out [example.js](example.js).
+For more complete examples, check out
+[good-examples.js](examples/good-examples.js).
+
+For a netcat HTTP web server monstrosity, see
+[evil-example.js](examples/evil-example.js).
 
 For the complete API reference, check out the
 [documentation](https://github.com/n2liquid/blastoise-shell/wiki/Where-is-the-documentation%3F).

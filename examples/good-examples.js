@@ -5,7 +5,7 @@ let {
   git,
   invalidCommand,
   vim,
-} = require('.');
+} = require('..');
 
 async function main() {
   // This is never run due to lazy promise behavior:
@@ -26,8 +26,8 @@ async function main() {
   await echo(`$ cat hellos # With console.log(await cat(...).toString())`);
   console.log(await cat('hellos').toString());
 
-  await echo(`$ cat example.js | grep example`);
-  await cat('example.js').grep('example');
+  await echo(`$ cat good-examples.js | grep example`);
+  await cat('good-examples.js').grep('example');
   await echo();
 
   await echo(`$ notify-send "i hackz ur computerz"`);
