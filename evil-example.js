@@ -1,4 +1,4 @@
-let sh = require('..');
+let sh = require('.');
 
 class Server {
   constructor(port) {
